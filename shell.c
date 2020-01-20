@@ -21,7 +21,7 @@ int analyse_n_execute(char *cmd);
 int checkexit(char *cmd);
 void normalexec(char *cmd);
 void pipenexec(char *cmd1, char * cmd2);
-void rediroutputexec(char *cmd, char *file);
+void ioredirexec(char *cmd, char *file, int redirection);
 void execute_cmd(char *full_cmd);
 
 int main(int argc, char *argv[]) {
@@ -55,6 +55,9 @@ int analyse_n_execute(char *cmd) {
 	for(i = 0; cmd[i]; i++)
 		if(cmd[i] == '|' || cmd[i] == '>' || cmd[i] == '<' || cmd[i] == '&' || cmd[i] == ';')
 			break;
+		else if(cmd[i] == '2' && cmd[i + 1] == '>')
+			if(i != 0 && (cmd[i - 1] == ' ' || cmd[i - 1] == '\t'))
+				break;
 	switch(cmd[i]) {
 		case '|':
 			cmd[i] = '\0';
@@ -64,9 +67,15 @@ int analyse_n_execute(char *cmd) {
 			cmd[i] = ' ';
 			strcpy(filepath,  (p = strtok(cmd + i + 1, " \t\n")));
 			strcpy(cmd + i + 1, p + strlen(p) + 1);
-			rediroutputexec(cmd, filepath);
+			ioredirexec(cmd, filepath, STDOUT_FILENO);
 			break;
 		case '<':
+			cmd[i] = ' ';
+			strcpy(filepath, (p = strtok(cmd + i + 1, " \t\n")));
+			strcpy(cmd + i + 1, p + strlen(p) + 1);
+			ioredirexec(cmd, filepath, STDIN_FILENO);
+			break;
+		case '2':
 			break;
 		case '&':
 			break;
@@ -112,7 +121,7 @@ void pipenexec(char *cmd1, char *cmd2) {
 		close(pfd[1]);
 		pid = fork();
 		if(pid == 0) {
-			dup2(pfd[0], 0);
+			dup2(pfd[0], STDIN_FILENO);
 			analyse_n_execute(cmd2);
 			exit(0);
 		}
@@ -122,16 +131,23 @@ void pipenexec(char *cmd1, char *cmd2) {
 	}
 }
 
-void rediroutputexec(char *cmd, char *file) {
-	int fd = open(file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-	int pid;
+void ioredirexec(char *cmd, char *file, int redirection) {
+	int fd, pid;
+	if(redirection == 0)
+		fd = open(file, O_RDONLY);
+	else if(redirection == 1 || redirection == 2)
+		fd = open(file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	else {
+		printf("Invalid redirection mode requested");
+		return;
+	}
 	if(fd == -1) {
 		perror("Error: ");
 		return;
 	}
 	pid = fork();
 	if(pid == 0) {
-		dup2(fd, 1);
+		dup2(fd, redirection);
 		analyse_n_execute(cmd);
 		exit(0);
 	}
@@ -155,6 +171,7 @@ void execute_cmd(char *full_cmd) {
 	if(cmd_name != NULL) {
 		args[0] = cmd_name;
 		i = 1;
+		/* tokeninse the full command into arguments */
 		while((args[i++] = strtok(NULL, " \t\n")));
 		if(execvpe(cmd_name, args, environ) == -1) 
 			perror("Error: ");
