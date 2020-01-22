@@ -50,6 +50,10 @@ int checkexit(char *cmd) {
 	return 0;
 }
 
+void mystrcpy(char *dest, char *src) {
+	while((*(dest++) = *(src++)));
+}
+
 int analyse_n_execute(char *cmd) {
 	int i, status = 0;
 	char filepath[MAX_FILEPATH], *p;
@@ -67,13 +71,13 @@ int analyse_n_execute(char *cmd) {
 		case '>':
 			cmd[i] = ' ';
 			strcpy(filepath,  (p = strtok(cmd + i + 1, " \t\n")));
-			strcpy(cmd + i + 1, p + strlen(p) + 1);
+			mystrcpy(cmd + i + 1, p + (strlen(p) + 1));
 			ioredirexec(cmd, filepath, STDOUT_FILENO);
 			break;
 		case '<':
 			cmd[i] = ' ';
 			strcpy(filepath, (p = strtok(cmd + i + 1, " \t\n")));
-			strcpy(cmd + i + 1, p + strlen(p) + 1);
+			mystrcpy(cmd + i + 1, p + (strlen(p) + 1));
 			ioredirexec(cmd, filepath, STDIN_FILENO);
 			break;
 		case '2':
@@ -86,6 +90,9 @@ int analyse_n_execute(char *cmd) {
 		case '&':
 			break;
 		case ';':
+			cmd[i] = '\0';
+			normalexec(cmd);
+			analyse_n_execute(cmd + i + 1);
 			break;
 		case '\0':
 			normalexec(cmd);
