@@ -37,15 +37,16 @@ int main(int argc, char *argv[]) {
 }	
 
 int checkexit(char *cmd) {
-	char checkexittext[6];
-	checkexittext[5] = '\0';
+	char checkexittext[5], extra;
 	int i = 0;
 	while(cmd[i] == ' ' || cmd[i] == '\t')
 		i++;
 	strncpy(checkexittext, cmd + i, 5);
-	if(!(strcmp(checkexittext, "exit ") && strcmp(checkexittext, "exit\t") && strcmp(checkexittext, "exit") && strcmp(checkexittext, "exit\n"))) {
-		return 1;
-	}
+	checkexittext[5] = '\0';
+	extra = *(cmd + i + 4);
+	if(!strcmp(checkexittext, "exit"))
+		if(extra == ' ' || extra == '\t' || extra == '\0' || extra == '\n')
+			return 1;
 	return 0;
 }
 
@@ -76,6 +77,11 @@ int analyse_n_execute(char *cmd) {
 			ioredirexec(cmd, filepath, STDIN_FILENO);
 			break;
 		case '2':
+			cmd[i] = ' ';
+			cmd[i + 1] = ' ';
+			strcpy(filepath, (p = strtok(cmd + i + 1, " \t\n")));
+			strcpy(cmd + i + 1, p + strlen(p) + 1);
+			ioredirexec(cmd, filepath, STDERR_FILENO);
 			break;
 		case '&':
 			break;
@@ -133,9 +139,9 @@ void pipenexec(char *cmd1, char *cmd2) {
 
 void ioredirexec(char *cmd, char *file, int redirection) {
 	int fd, pid;
-	if(redirection == 0)
+	if(redirection == STDIN_FILENO)
 		fd = open(file, O_RDONLY);
-	else if(redirection == 1 || redirection == 2)
+	else if(redirection == STDOUT_FILENO || redirection == STDERR_FILENO)
 		fd = open(file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	else {
 		printf("Invalid redirection mode requested");
