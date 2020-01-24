@@ -131,7 +131,14 @@ int startswith(char *line, char *starting) {
 }
 
 void cd(char *cmd) {
-	
+	char *tok;
+	strtok(cmd, " \t\n");
+	if((tok = strtok(NULL, " \t\n"))) {
+		if(chdir(tok) == -1)
+			perror("cd");			
+	}
+	else
+		chdir(HOME);
 }
 
 void normalexec(char *cmd) {
@@ -188,7 +195,7 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 		return;
 	}
 	if(fd == -1) {
-		perror("Error: ");
+		perror("Error");
 		return;
 	}
 	pid = fork();
@@ -220,7 +227,7 @@ void execute_cmd(char *full_cmd) {
 		/* tokeninse the full command into arguments */
 		while((args[i++] = strtok(NULL, " \t\n")));
 		if(execvpe(cmd_name, args, environ) == -1) 
-			perror("Error: ");
+			perror("Error");
 	}
 	free(args);
 }
