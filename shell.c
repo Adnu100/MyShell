@@ -15,39 +15,50 @@
 #define MAX_FILEPATH 256
 
 extern char **environ;
-const char PATH[] = "PATH=/home/adnesh/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin";
+
+char *HOME = NULL, *LOGIN = NULL, *SESSION = NULL;
+int LENHOME = 0;
 
 int analyse_n_execute(char *cmd);
-int checkexit(char *cmd);
+int strstr_start(char *bigstr, char *smallstr);
+int startswith(char *line, char *starting);
+void cd(char *cmd);
 void normalexec(char *cmd);
 void pipenexec(char *cmd1, char * cmd2);
 void ioredirexec(char *cmd, char *file, int redirection);
 void execute_cmd(char *full_cmd);
+void initprompt(void);
+void prompt(void);
+void mystrcpy(char *dest, char *src);
 
 int main(int argc, char *argv[]) {
 	char *cmd = (char *)malloc(sizeof(char) * MAX_COMMAND_LENGTH);
-	printf("--$ ");
+	initprompt();
+	prompt();
 	while(fgets(cmd, MAX_COMMAND_LENGTH, stdin)) {
 		if(analyse_n_execute(cmd) == -1)
 			return 0;
-		printf("--$ ");
+		prompt();
 	}
 	printf("exit\n");
 	return 0;
 }	
 
-int checkexit(char *cmd) {
-	char checkexittext[5], extra;
-	int i = 0;
-	while(cmd[i] == ' ' || cmd[i] == '\t')
-		i++;
-	strncpy(checkexittext, cmd + i, 5);
-	checkexittext[5] = '\0';
-	extra = *(cmd + i + 4);
-	if(!strcmp(checkexittext, "exit"))
-		if(extra == ' ' || extra == '\t' || extra == '\0' || extra == '\n')
-			return 1;
-	return 0;
+void initprompt(void) {
+	HOME = getenv("HOME");
+	LENHOME = strlen(HOME);
+	LOGIN = getlogin();
+	SESSION = getenv("DESKTOP_SESSION");
+}
+
+void prompt(void) {
+	char *dname = get_current_dir_name();
+	if(strstr_start(dname, HOME)) {
+		dname[0] = '~';
+		mystrcpy(dname + 1, dname + LENHOME);
+	}
+	printf("%s@%s:%s$ ", LOGIN, SESSION, dname);
+	free(dname);
 }
 
 void mystrcpy(char *dest, char *src) {
@@ -103,10 +114,32 @@ int analyse_n_execute(char *cmd) {
 	return status;
 }	
 
+int strstr_start(char *bigstr, char *smallstr) {
+	while(*smallstr && (*(bigstr++) == *(smallstr++)));
+	return *smallstr ? 0 : 1;
+}
+
+int startswith(char *line, char *starting) {
+	while(*line == ' ' || *line == '\t')
+		line++;
+	if(strstr_start(line, starting)) {
+		line += strlen(starting);
+		if(*line == ' ' || *line == '\t' || *line == '\n')
+			return 1;
+	}
+	return 0;
+}
+
+void cd(char *cmd) {
+	
+}
+
 void normalexec(char *cmd) {
 	int pid;
-	if(checkexit(cmd))
+	if(startswith(cmd, "exit"))
 		exit(0);
+	else if(startswith(cmd, "cd"))
+		cd(cmd);
 	else {
 		pid = fork();
 		if(pid == 0) {
