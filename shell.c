@@ -14,18 +14,8 @@
 #include "prompt.h"
 #include "jobsmanager.h"
 
-extern char **environ;
 int child = 0, stopped = 0;
-
-int analyse_n_execute(char *cmd);
-int strstr_start(char *bigstr, char *smallstr);
-int startswith(char *line, char *starting);
-void normalexec(char *cmd, int w);
-void pipenexec(char *cmd1, char * cmd2);
-void ioredirexec(char *cmd, char *file, int redirection);
-void execute_cmd(char *full_cmd);
-void mystrcpy(char *dest, char *src);
-void act(int signal_number);
+pid_t current = 0;
 
 void act(int signal_number) {
 	if(!child) {
@@ -53,10 +43,6 @@ int main(int argc, char *argv[]) {
 	printf("exit\n");
 	return 0;
 }	
-
-void mystrcpy(char *dest, char *src) {
-	while((*(dest++) = *(src++)));
-}
 
 int analyse_n_execute(char *cmd) {
 	int i, status = 0;
@@ -128,14 +114,13 @@ void normalexec(char *cmd, int w) {
 			exit(0);
 		}
 		else {
-			child++;
 			stopped = pid;
 			if(w) 
 				waitpid(pid, &ws, WUNTRACED);
 			else 
 				waitpid(pid, &ws, WNOHANG | WUNTRACED);
-			if(WIFEXITED(ws))
-				child--;
+			if(WIFSTOPPED(ws)) 
+				appendjob(cmd, pid);
 		}
 	}
 }

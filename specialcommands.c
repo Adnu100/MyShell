@@ -1,11 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <ctype.h>
 #include "shell.h"
-
-extern int child, stopped;
+#include "jobsmanager.h"
 
 int startswith(char *line, char *starting) {
 	while(*line == ' ' || *line == '\t')
@@ -16,6 +17,15 @@ int startswith(char *line, char *starting) {
 			return 1;
 	}
 	return 0;
+}
+
+void mystrcpy(char *dest, char *src) {
+	while((*(dest++) = *(src++)));
+}
+
+int strstr_start(char *bigstr, char *smallstr) {
+	while(*smallstr && (*(bigstr++) == *(smallstr++)));
+	return (!(*smallstr) && *(smallstr - 1) == *(bigstr - 1));
 }
 
 void cd(char *cmd) {
@@ -31,28 +41,79 @@ void cd(char *cmd) {
 
 void fg(char *cmd) {
 	int ws;
-	if(!stopped) 
-		printf("fg: current: no such job\n");
+	int pid;
+	char *tok;
+	if(!gettotaljobs()) 
+		printf("fg: current: no such job exist\n");
 	else {
-		kill(stopped, SIGCONT);
-		waitpid(stopped, &ws, WUNTRACED);
-		if(WIFEXITED(ws)) {
-			child--;
-			stopped = 0;
+		strtok(cmd, " \t\n");
+		tok = strtok(cmd, " \t\n");
+		if(tok) {
+			if(isdigit((int)tok[0])) 
+				pid = popbynumber(atoi(tok));
+			else
+				pid = popbyidentifier(tok);
+			if(!pid) {
+				printf("fg: %s: no such job exist\n");
+				return;
+			}		
 		}
-		stopped = 0;
+		else
+			pid = popjob();
+		kill(pid, SIGCONT);
+		waitpid(pid, &ws, WUNTRACED);
+		if(WIFSTOPPED(ws))
+			remount();
 	}
 }
 
 void bg(char *cmd) {
-	if(stopped)
-		printf("[%d]\n", stopped);
-	else
+	int ws;
+	int pid;
+	char *tok;
+	if(!gettotaljobs()) 
 		printf("bg: current: no such job exist\n");
+	else {
+		strtok(cmd, " \t\n");
+		tok = strtok(cmd, " \t\n");
+		if(tok) {
+			if(isdigit((int)tok[0])) 
+				pid = popbynumber(atoi(tok));
+			else
+				pid = popbyidentifier(tok);
+			if(!pid) {
+				printf("fg: %s: no such job exist\n");
+				return;
+			}		
+		}
+		else
+			pid = popjob();
+		kill(pid, SIGCONT);
+		waitpid(pid, &ws, WUNTRACED | WNOHANG);
+		if(WIFSTOPPED(ws))
+			remount();
+	}
+
 }
 
 void jobsl(char *cmd) {
-	
+	char *tok;
+	strtok(cmd, " \t\n");
+	tok = strtok(NULL, " \t\n");
+	if(tok)
+		while(tok) {
+			if(isdigit((int)tok[0])) {
+				if(!printjobbynumber(atoi(tok))) 
+					printf("jobs: %s: no such job exist\n", tok);
+			}
+			else {
+				if(!printjobbyidentifier(tok))
+					printf("jobs: %s: no such job exist\n", tok);
+			}
+			tok = strtok(NULL, " \t\n");
+		}
+	else
+		printalljobs();
 }
 
 

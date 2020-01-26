@@ -11,19 +11,25 @@ typedef struct job_t {
 
 typedef struct node {
 	job_t job;
-	struct node *prev;
+	struct node *next, *prev;
 } node;
 
 typedef struct jobs {
 	int total;
-	node *list;
+	node *tail;
+	node *head;
 } jobs;
 
-void initjobs();
+void initjobs(void);
 void appendjob(char *cmd, pid_t pid);
-pid_t popjob();
+pid_t popjob(void);
 pid_t popbyidentifier(char *identifier);
 pid_t popbynumber(int n);
+int gettotaljobs(void);
+void remount(void);
+void printalljobs(void);
+int printjobbynumber(int number);
+int printjobbyidentifier(char *identifier);
 
 extern jobs alljobs;
 

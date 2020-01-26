@@ -10,6 +10,8 @@ prompt.o: prompt.c shell.h prompt.h
 jobsmanager.o: jobsmanager.c shell.h jobsmanager.h
 	cc jobsmanager.c -c -Wall
 
-specialcommands.o: specialcommands.c shell.h
+specialcommands.o: specialcommands.c shell.h jobsmanager.h
 	cc specialcommands.c -c -Wall
 
+clean: 
+	rm -rf *.o
