@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -9,6 +10,14 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+
+#define HEADER "\033[95m"
+#define OKBLUE "\033[94m"
+#define OKGREEN "\033[92m"
+#define WARNING "\033[93m"
+#define BOLD "\033[1m"
+#define ENDC "\033[0m"
+#define FAIL "\033[91m"
 
 #define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGS ((MAX_COMMAND_LENGTH) / 2)
@@ -19,26 +28,45 @@ extern char **environ;
 char *HOME = NULL, *LOGIN = NULL, *SESSION = NULL;
 int LENHOME = 0;
 
+pid_t child = 0, stopped = 0;
+sighandler_t default_stop = NULL, default_pause = NULL;
+
 int analyse_n_execute(char *cmd);
 int strstr_start(char *bigstr, char *smallstr);
 int startswith(char *line, char *starting);
 void cd(char *cmd);
-void normalexec(char *cmd);
+void fg(char *cmd);
+void bg(char *cmd);
+void normalexec(char *cmd, int w);
 void pipenexec(char *cmd1, char * cmd2);
 void ioredirexec(char *cmd, char *file, int redirection);
 void execute_cmd(char *full_cmd);
 void initprompt(void);
 void prompt(void);
 void mystrcpy(char *dest, char *src);
+void act(int signal_number);
+
+void act(int signal_number) {
+	if(!child) {
+		putchar('\n');
+		prompt();
+		fflush(stdout);
+	}
+	else
+		kill(stopped, signal_number);
+}
 
 int main(int argc, char *argv[]) {
 	char *cmd = (char *)malloc(sizeof(char) * MAX_COMMAND_LENGTH);
+	default_stop = signal(SIGINT, act);
+	default_pause = signal(SIGTSTP, act);
 	initprompt();
 	prompt();
 	while(fgets(cmd, MAX_COMMAND_LENGTH, stdin)) {
 		if(analyse_n_execute(cmd) == -1)
 			return 0;
 		prompt();
+		fflush(stdout);
 	}
 	printf("exit\n");
 	return 0;
@@ -48,7 +76,6 @@ void initprompt(void) {
 	HOME = getenv("HOME");
 	LENHOME = strlen(HOME);
 	LOGIN = getlogin();
-	SESSION = getenv("DESKTOP_SESSION");
 }
 
 void prompt(void) {
@@ -57,7 +84,7 @@ void prompt(void) {
 		dname[0] = '~';
 		mystrcpy(dname + 1, dname + LENHOME);
 	}
-	printf("%s@%s:%s$ ", LOGIN, SESSION, dname);
+	printf(BOLD OKGREEN "%s@localhost" ENDC ":" BOLD OKBLUE "%s" ENDC HEADER "(myshell)" ENDC "$ ", LOGIN, dname);
 	free(dname);
 }
 
@@ -99,14 +126,16 @@ int analyse_n_execute(char *cmd) {
 			ioredirexec(cmd, filepath, STDERR_FILENO);
 			break;
 		case '&':
+			cmd[i] = '\0';
+			normalexec(cmd, 0);
 			break;
 		case ';':
 			cmd[i] = '\0';
-			normalexec(cmd);
+			normalexec(cmd, 1);
 			analyse_n_execute(cmd + i + 1);
 			break;
 		case '\0':
-			normalexec(cmd);
+			normalexec(cmd, 1);
 			break;
 		default:
 			break;
@@ -141,51 +170,94 @@ void cd(char *cmd) {
 		chdir(HOME);
 }
 
-void normalexec(char *cmd) {
-	int pid;
+void fg(char *cmd) {
+	int ws;
+	if(!stopped) 
+		printf("fg: current: no such job\n");
+	else {
+		kill(stopped, SIGCONT);
+		waitpid(stopped, &ws, WUNTRACED);
+		if(WIFEXITED(ws)) {
+			child--;
+			stopped = 0;
+		}
+		stopped = 0;
+	}
+}
+
+void bg(char *cmd) {
+	if(stopped)
+		printf("[%d]\n", stopped);
+	else
+		printf("bg: current: no such job exist\n");
+}
+
+void normalexec(char *cmd, int w) {
+	int pid, ws;
 	if(startswith(cmd, "exit"))
 		exit(0);
 	else if(startswith(cmd, "cd"))
 		cd(cmd);
+	else if(startswith(cmd, "fg")) 
+		fg(cmd);	
+	else if(startswith(cmd, "bg"))
+		bg(cmd);
 	else {
 		pid = fork();
 		if(pid == 0) {
 			execute_cmd(cmd);
 			exit(0);
 		}
-		else
-			wait(0);
+		else {
+			child++;
+			stopped = pid;
+			if(w) 
+				waitpid(pid, &ws, WUNTRACED);
+			else 
+				waitpid(pid, &ws, WNOHANG | WUNTRACED);
+			if(WIFEXITED(ws))
+				child--;
+		}
 	}
 }
 
 void pipenexec(char *cmd1, char *cmd2) {
-	int pid, pfd[2];
+	int pid, pid2, pfd[2], ws;
 	pipe(pfd);
 	pid = fork();
 	if(pid == 0) {
 		close(pfd[0]);
-		dup2(pfd[1], 1);
+		dup2(pfd[1], STDOUT_FILENO);
 		execute_cmd(cmd1);
 		close(pfd[1]);
 		exit(0);
 	}
 	else {
-		wait(0);
+		child++;
+		stopped = pid;
+		waitpid(pid, &ws, WUNTRACED);
 		close(pfd[1]);
-		pid = fork();
-		if(pid == 0) {
-			dup2(pfd[0], STDIN_FILENO);
-			analyse_n_execute(cmd2);
+		pid2 = fork();
+		if(pid2 == 0) {
+			waitpid(pid, &ws, 0);
+			if(WIFEXITED(ws)) {
+				dup2(pfd[0], STDIN_FILENO);
+				analyse_n_execute(cmd2);
+			}
 			exit(0);
 		}
-		else
-			wait(0);
-		close(pfd[0]);
+		else {
+			stopped = pid2;
+			waitpid(pid2, &ws, WUNTRACED);
+			if(WIFEXITED(ws))
+				child--;
+			close(pfd[0]);
+		}		
 	}
 }
 
 void ioredirexec(char *cmd, char *file, int redirection) {
-	int fd, pid;
+	int fd, pid, ws;
 	if(redirection == STDIN_FILENO)
 		fd = open(file, O_RDONLY);
 	else if(redirection == STDOUT_FILENO || redirection == STDERR_FILENO)
@@ -204,9 +276,15 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 		analyse_n_execute(cmd);
 		exit(0);
 	}
-	else 
-		wait(0);
-	close(fd);
+	else { 
+		child++;
+		stopped = pid;
+		waitpid(pid, &ws, WUNTRACED);
+		if(WIFEXITED(ws)) {
+			child--;
+			close(fd);
+		}
+	}
 }
 
 /* For the last free function call in execute_cmd:
