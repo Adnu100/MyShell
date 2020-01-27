@@ -47,19 +47,20 @@ void fg(char *cmd) {
 		printf("fg: current: no such job exist\n");
 	else {
 		strtok(cmd, " \t\n");
-		tok = strtok(cmd, " \t\n");
+		tok = strtok(NULL, " \t\n");
 		if(tok) {
 			if(isdigit((int)tok[0])) 
 				pid = popbynumber(atoi(tok));
 			else
 				pid = popbyidentifier(tok);
 			if(!pid) {
-				printf("fg: %s: no such job exist\n");
+				printf("fg: %s: no such job exist\n", tok);
 				return;
 			}		
 		}
-		else
+		else 
 			pid = popjob();
+		child = pid;
 		kill(pid, SIGCONT);
 		waitpid(pid, &ws, WUNTRACED);
 		if(WIFSTOPPED(ws))
@@ -82,7 +83,7 @@ void bg(char *cmd) {
 			else
 				pid = popbyidentifier(tok);
 			if(!pid) {
-				printf("fg: %s: no such job exist\n");
+				printf("fg: %s: no such job exist\n", tok);
 				return;
 			}		
 		}
@@ -112,8 +113,8 @@ void jobsl(char *cmd) {
 			}
 			tok = strtok(NULL, " \t\n");
 		}
-	else
-		printalljobs();
+	else if(!printalljobs())
+		printf("jobs: current: no such job exist\n");
 }
 
 

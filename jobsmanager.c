@@ -18,7 +18,7 @@ void initjobs() {
 void appendjob(char *cmd, pid_t pid) {
 	int n;
 	if(alljobs.total) {
-		n = alljobs.tail->job.job_number;
+		n = alljobs.tail->job.job_number + 1;
 		alljobs.tail->next = (node *)malloc(sizeof(node));
 		alljobs.tail->next->prev = alljobs.tail;
 		alljobs.tail->next->next = NULL;
@@ -73,6 +73,7 @@ pid_t popbyidentifier(char *identifier) {
 				n->prev->next = n->next;
 			else
 				alljobs.head = n->next;
+			break;
 		}
 		n = n->prev;
 	}
@@ -98,6 +99,7 @@ pid_t popbynumber(int number) {
 				n->prev->next = n->next;
 			else
 				alljobs.head = n->next;
+			break;
 
 		}
 		n = n->next;
@@ -128,7 +130,7 @@ void remount(void) {
 	alljobs.total++;
 }
 
-void printalljobs(void) {
+int printalljobs(void) {
 	node *n = alljobs.head;
 	if(alljobs.total) {
 		while(n) {
@@ -136,8 +138,7 @@ void printalljobs(void) {
 			n = n->next;
 		}
 	}
-	else
-		printf("jobs: current: no such job exist\n");
+	return alljobs.total;
 }
 
 int printjobbynumber(int number) {

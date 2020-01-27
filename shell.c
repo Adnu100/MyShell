@@ -14,8 +14,9 @@
 #include "prompt.h"
 #include "jobsmanager.h"
 
-int child = 0, stopped = 0;
-pid_t current = 0;
+
+pid_t child = 0;
+int stopped = 0;
 
 void act(int signal_number) {
 	if(!child) {
@@ -24,7 +25,7 @@ void act(int signal_number) {
 		fflush(stdout);
 	}
 	else
-		kill(stopped, signal_number);
+		kill(child, signal_number);
 }
 
 int main(int argc, char *argv[]) {
@@ -114,13 +115,14 @@ void normalexec(char *cmd, int w) {
 			exit(0);
 		}
 		else {
-			stopped = pid;
+			child = pid;
 			if(w) 
 				waitpid(pid, &ws, WUNTRACED);
 			else 
 				waitpid(pid, &ws, WNOHANG | WUNTRACED);
 			if(WIFSTOPPED(ws)) 
 				appendjob(cmd, pid);
+			child = 0;
 		}
 	}
 }

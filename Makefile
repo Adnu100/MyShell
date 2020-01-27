@@ -1,5 +1,5 @@
 shell: shell.o prompt.o jobsmanager.o specialcommands.o
-	cc shell.c prompt.c jobsmanager.c specialcommands.c -Wall -o shell
+	cc shell.o prompt.o jobsmanager.o specialcommands.o -Wall -o shell
 
 shell.o: shell.c shell.h prompt.h jobsmanager.h
 	cc shell.c -c -Wall 

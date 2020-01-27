@@ -9,6 +9,8 @@ extern char **environ;
 
 extern char *HOME;
 
+extern pid_t child;
+
 void mystrcpy(char *dest, char *src);
 int strstr_start(char *bigstr, char *smallstr);
 void cd(char *cmd);

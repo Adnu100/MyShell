@@ -27,7 +27,7 @@ pid_t popbyidentifier(char *identifier);
 pid_t popbynumber(int n);
 int gettotaljobs(void);
 void remount(void);
-void printalljobs(void);
+int printalljobs(void);
 int printjobbynumber(int number);
 int printjobbyidentifier(char *identifier);
 
