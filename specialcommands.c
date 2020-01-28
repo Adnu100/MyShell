@@ -76,14 +76,14 @@ void bg(char *cmd) {
 		printf("bg: current: no such job exist\n");
 	else {
 		strtok(cmd, " \t\n");
-		tok = strtok(cmd, " \t\n");
+		tok = strtok(NULL, " \t\n");
 		if(tok) {
 			if(isdigit((int)tok[0])) 
 				pid = popbynumber(atoi(tok));
 			else
 				pid = popbyidentifier(tok);
 			if(!pid) {
-				printf("fg: %s: no such job exist\n", tok);
+				printf("bg: %s: no such job exist\n", tok);
 				return;
 			}		
 		}
