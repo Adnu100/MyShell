@@ -17,22 +17,43 @@
 
 pid_t child = 0;
 int stopped = 0;
+sighandler_t default_close = NULL, default_stop = NULL, default_continue = NULL;
+int childflag = 0;
 
 void act(int signal_number) {
-	if(!child) {
-		putchar('\n');
-		prompt();
-		fflush(stdout);
+	int ws;
+	if(signal_number == SIGCONT) {
+		if(child) {
+			kill(child, SIGCONT);
+			waitpid(child, &ws, WUNTRACED);
+			if(WIFEXITED(ws))
+				exit(0);
+		}
 	}
-	else
+	else if(childflag) {
 		kill(child, signal_number);
+		if(signal_number == SIGINT)
+			default_close(SIGINT);
+		else if(signal_number == SIGTSTP)
+			default_stop(SIGSTOP);
+	}
+	else {
+		if(!child) {
+			putchar('\n');
+			prompt();
+			fflush(stdout);
+		}
+		else
+			kill(child, signal_number);
+	}
 }
 
 int main(int argc, char *argv[]) {
 	char *cmd = (char *)malloc(sizeof(char) * MAX_COMMAND_LENGTH);
 	initjobs();
-	signal(SIGINT, act);
-	signal(SIGTSTP, act);
+	default_close = signal(SIGINT, act);
+	default_stop = signal(SIGTSTP, act);
+	default_continue = signal(SIGCONT, act);
 	initprompt();
 	prompt();
 	while(fgets(cmd, MAX_COMMAND_LENGTH, stdin)) {
@@ -139,8 +160,7 @@ void pipenexec(char *cmd1, char *cmd2) {
 		exit(0);
 	}
 	else {
-		child++;
-		stopped = pid;
+		child = pid;
 		waitpid(pid, &ws, WUNTRACED);
 		close(pfd[1]);
 		pid2 = fork();
@@ -156,7 +176,7 @@ void pipenexec(char *cmd1, char *cmd2) {
 			stopped = pid2;
 			waitpid(pid2, &ws, WUNTRACED);
 			if(WIFEXITED(ws))
-				child--;
+				child = 0;
 			close(pfd[0]);
 		}		
 	}
@@ -178,19 +198,22 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 	}
 	pid = fork();
 	if(pid == 0) {
+		childflag = 1;
 		dup2(fd, redirection);
 		analyse_n_execute(cmd);
+		fprintf(stderr, "Exiting\n");
+		fflush(stderr);
 		exit(0);
 	}
 	else { 
-		child++;
-		stopped = pid;
+		child = pid;
 		waitpid(pid, &ws, WUNTRACED);
-		if(WIFEXITED(ws)) {
-			child--;
-			close(fd);
-		}
+		if(WIFSTOPPED(ws) || WIFSIGNALED(ws)) 
+			appendjob(cmd, pid);
+		child = 0;
 	}
+	ftruncate(fd, lseek(fd, 0, SEEK_CUR));
+	close(fd);
 }
 
 /* For the last free function call in execute_cmd:
