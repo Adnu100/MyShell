@@ -4,7 +4,8 @@
 #include "shell.h"
 #include "jobsmanager.h"
 
-jobs alljobs;
+jobs alljobs = {0};
+pstatus lstatus;
 int INITIALISED = 0;
 node *cached = NULL;
 
@@ -15,7 +16,7 @@ void initjobs() {
 	}		
 }
 
-void appendjob(char *cmd, pid_t pid) {
+void appendjob(char *cmd, pid_t pid, pstatus status) {
 	int n;
 	if(alljobs.total) {
 		n = alljobs.tail->job.job_number + 1;
@@ -33,7 +34,12 @@ void appendjob(char *cmd, pid_t pid) {
 	strcpy(alljobs.tail->job.identifier, cmd);
 	alljobs.tail->job.pid = pid;
 	alljobs.tail->job.job_number = n;
+	alljobs.tail->job.status = status;
 	alljobs.total++;
+	if(status == STOPPED) 
+		printf("\n[%d]\tstopped\t%s", alljobs.tail->job.job_number, alljobs.tail->job.identifier);	
+	else 
+		printf("[%d] %d", alljobs.tail->job.job_number, pid);
 }
 
 pid_t popjob(void) {
@@ -52,6 +58,8 @@ pid_t popjob(void) {
 	else
 		alljobs.tail = alljobs.head = NULL;
 	printf("%s", cached->job.identifier);
+	fflush(stdout);
+	lstatus = cached->job.status;
 	return cached->job.pid;
 }
 
@@ -78,6 +86,7 @@ pid_t popbyidentifier(char *identifier) {
 		n = n->prev;
 	}
 	printf("%s", cached->job.identifier);
+	lstatus = cached->job.status;
 	return cached->job.pid;
 }
 
@@ -105,6 +114,7 @@ pid_t popbynumber(int number) {
 		n = n->next;
 	}
 	printf("%s", cached->job.identifier);
+	lstatus = cached->job.status;
 	return cached->job.pid;
 }
 
@@ -112,9 +122,10 @@ int gettotaljobs(void) {
 	return alljobs.total;
 }
 
-void remount(void) {
+void remount(pstatus running) {
 	if(!cached)
 		return;
+	cached->job.status = RUNNING;
 	cached->next = NULL;
 	if(alljobs.total) {
 		cached->prev = alljobs.tail;
@@ -127,14 +138,20 @@ void remount(void) {
 		cached->prev = NULL;
 		cached->job.job_number = 1;
 	}
+	if(running == STOPPED)
+		printf("\n[%d]\tstopped\t%s", cached->job.job_number, cached->job.identifier);
 	alljobs.total++;
+	cached = NULL;
 }
 
 int printalljobs(void) {
 	node *n = alljobs.head;
 	if(alljobs.total) {
 		while(n) {
-			printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			if(n->job.status == STOPPED)
+				printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			else if(n->job.status == RUNNING)
+				printf("[%d]\trunning\t\t%s", n->job.job_number, n->job.identifier);
 			n = n->next;
 		}
 	}
@@ -148,7 +165,10 @@ int printjobbynumber(int number) {
 	n = alljobs.head;
 	while(n) {
 		if(n->job.job_number == number) {
-			printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			if(n->job.status == STOPPED)
+				printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			else if(n->job.status == RUNNING)
+				printf("[%d]\trunning\t\t%s", n->job.job_number, n->job.identifier);
 			return 1;
 		}
 		n = n->next;
@@ -163,10 +183,17 @@ int printjobbyidentifier(char *identifier) {
 	n = alljobs.tail;
 	while(n) {
 		if(strstr_start(n->job.identifier, identifier)) {
-			printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			if(n->job.status == STOPPED)
+				printf("[%d]\tstopped\t\t%s", n->job.job_number, n->job.identifier);
+			else if(n->job.status == RUNNING)
+				printf("[%d]\trunning\t\t%s", n->job.job_number, n->job.identifier);
 			return 1;
 		}
 		n = n->next;
 	}
 	return 0;
+}
+
+void updatejobs(void) {
+		
 }

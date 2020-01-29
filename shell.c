@@ -14,51 +14,42 @@
 #include "prompt.h"
 #include "jobsmanager.h"
 
-
 pid_t child = 0;
-int stopped = 0;
-sighandler_t default_close = NULL, default_stop = NULL, default_continue = NULL;
-int childflag = 0;
+short int childflag = 0, updateflag = 0;
+char *unicmd = NULL;
 
 void act(int signal_number) {
-	int ws;
-	if(signal_number == SIGCONT) {
-		if(child) {
-			kill(child, SIGCONT);
-			waitpid(child, &ws, WUNTRACED);
-			if(WIFEXITED(ws))
-				exit(0);
-		}
+	if(!child) {
+		putchar('\n');
+		prompt();
+		fflush(stdout);
 	}
-	else if(childflag) {
+	else
 		kill(child, signal_number);
-		if(signal_number == SIGINT)
-			default_close(SIGINT);
-		else if(signal_number == SIGTSTP)
-			default_stop(SIGSTOP);
-	}
-	else {
-		if(!child) {
-			putchar('\n');
-			prompt();
-			fflush(stdout);
-		}
-		else
-			kill(child, signal_number);
-	}
+}
+
+void chact(int n) {
+	if(child)
+		return;
+	updateflag = 1;
 }
 
 int main(int argc, char *argv[]) {
 	char *cmd = (char *)malloc(sizeof(char) * MAX_COMMAND_LENGTH);
+	unicmd = (char *)malloc(sizeof(char) * MAX_COMMAND_LENGTH);
 	initjobs();
-	default_close = signal(SIGINT, act);
-	default_stop = signal(SIGTSTP, act);
-	default_continue = signal(SIGCONT, act);
+	signal(SIGINT, act);
+	signal(SIGTSTP, act);
+	signal(SIGCONT, act);
+	signal(SIGCHLD, act);
 	initprompt();
 	prompt();
 	while(fgets(cmd, MAX_COMMAND_LENGTH, stdin)) {
+		strcpy(unicmd, cmd);
 		if(analyse_n_execute(cmd) == -1)
 			return 0;
+		if(updateflag)
+			updatejobs();
 		prompt();
 		fflush(stdout);
 	}
@@ -129,7 +120,9 @@ void normalexec(char *cmd, int w) {
 		bg(cmd);
 	else if(startswith(cmd, "jobs"))
 		jobsl(cmd);
-	else {
+	else if(childflag)
+		execute_cmd(cmd);
+	else{
 		pid = fork();
 		if(pid == 0) {
 			execute_cmd(cmd);
@@ -137,12 +130,15 @@ void normalexec(char *cmd, int w) {
 		}
 		else {
 			child = pid;
-			if(w) 
+			if(w) {
 				waitpid(pid, &ws, WUNTRACED);
-			else 
+				if(WIFSTOPPED(ws)) 
+					appendjob(unicmd, pid, STOPPED);
+			}
+			else { 
 				waitpid(pid, &ws, WNOHANG | WUNTRACED);
-			if(WIFSTOPPED(ws)) 
-				appendjob(cmd, pid);
+				appendjob(unicmd, pid, RUNNING);
+			}
 			child = 0;
 		}
 	}
@@ -162,10 +158,11 @@ void pipenexec(char *cmd1, char *cmd2) {
 	else {
 		child = pid;
 		waitpid(pid, &ws, WUNTRACED);
+		if(WIFSTOPPED(ws))
+			appendjob(unicmd, pid, STOPPED);
 		close(pfd[1]);
 		pid2 = fork();
 		if(pid2 == 0) {
-			waitpid(pid, &ws, 0);
 			if(WIFEXITED(ws)) {
 				dup2(pfd[0], STDIN_FILENO);
 				analyse_n_execute(cmd2);
@@ -173,10 +170,8 @@ void pipenexec(char *cmd1, char *cmd2) {
 			exit(0);
 		}
 		else {
-			stopped = pid2;
 			waitpid(pid2, &ws, WUNTRACED);
-			if(WIFEXITED(ws))
-				child = 0;
+			child = 0;
 			close(pfd[0]);
 		}		
 	}
@@ -196,6 +191,11 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 		perror("Error");
 		return;
 	}
+	if(childflag) {
+		dup2(fd, redirection);
+		analyse_n_execute(cmd);
+		exit(0);
+	}
 	pid = fork();
 	if(pid == 0) {
 		childflag = 1;
@@ -206,8 +206,8 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 	else { 
 		child = pid;
 		waitpid(pid, &ws, WUNTRACED);
-		if(WIFSTOPPED(ws) || WIFSIGNALED(ws)) 
-			appendjob(cmd, pid);
+		if(WIFSTOPPED(ws))
+			appendjob(unicmd, pid, STOPPED);
 		child = 0;
 	}
 	ftruncate(fd, lseek(fd, 0, SEEK_CUR));

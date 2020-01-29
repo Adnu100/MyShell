@@ -61,15 +61,16 @@ void fg(char *cmd) {
 		else 
 			pid = popjob();
 		child = pid;
-		kill(pid, SIGCONT);
+		if(lstatus == STOPPED)
+			kill(pid, SIGCONT);
 		waitpid(pid, &ws, WUNTRACED);
 		if(WIFSTOPPED(ws))
-			remount();
+			remount(STOPPED);
+		child = 0;
 	}
 }
 
 void bg(char *cmd) {
-	int ws;
 	int pid;
 	char *tok;
 	if(!gettotaljobs()) 
@@ -89,12 +90,13 @@ void bg(char *cmd) {
 		}
 		else
 			pid = popjob();
-		kill(pid, SIGCONT);
-		waitpid(pid, &ws, WUNTRACED | WNOHANG);
-		if(WIFSTOPPED(ws))
-			remount();
+		if(lstatus == STOPPED) {
+			kill(pid, SIGCONT);
+			remount(RUNNING);
+		}
+		else if(lstatus == RUNNING)
+			printf("bg: job already running in background\n");	
 	}
-
 }
 
 void jobsl(char *cmd) {
