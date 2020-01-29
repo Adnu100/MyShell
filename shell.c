@@ -201,8 +201,6 @@ void ioredirexec(char *cmd, char *file, int redirection) {
 		childflag = 1;
 		dup2(fd, redirection);
 		analyse_n_execute(cmd);
-		fprintf(stderr, "Exiting\n");
-		fflush(stderr);
 		exit(0);
 	}
 	else { 
