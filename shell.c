@@ -41,15 +41,17 @@ int main(int argc, char *argv[]) {
 	signal(SIGINT, act);
 	signal(SIGTSTP, act);
 	signal(SIGCONT, act);
-	signal(SIGCHLD, act);
+	signal(SIGCHLD, chact);
 	initprompt();
 	prompt();
 	while(fgets(cmd, MAX_COMMAND_LENGTH, stdin)) {
 		strcpy(unicmd, cmd);
 		if(analyse_n_execute(cmd) == -1)
 			return 0;
-		if(updateflag)
+		if(updateflag) {
 			updatejobs();
+			updateflag = 0;
+		}
 		prompt();
 		fflush(stdout);
 	}

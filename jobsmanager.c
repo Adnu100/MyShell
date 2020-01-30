@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "shell.h"
 #include "jobsmanager.h"
 
 jobs alljobs = {0};
 pstatus lstatus;
-int INITIALISED = 0;
+int INITIALISED = 0, NOPRINT = 0;
 node *cached = NULL;
 
 void initjobs() {
@@ -57,7 +59,8 @@ pid_t popjob(void) {
 	}
 	else
 		alljobs.tail = alljobs.head = NULL;
-	printf("%s", cached->job.identifier);
+	if(!NOPRINT)
+		printf("%s", cached->job.identifier);
 	fflush(stdout);
 	lstatus = cached->job.status;
 	return cached->job.pid;
@@ -85,7 +88,8 @@ pid_t popbyidentifier(char *identifier) {
 		}
 		n = n->prev;
 	}
-	printf("%s", cached->job.identifier);
+	if(!NOPRINT)
+		printf("%s", cached->job.identifier);
 	lstatus = cached->job.status;
 	return cached->job.pid;
 }
@@ -113,7 +117,8 @@ pid_t popbynumber(int number) {
 		}
 		n = n->next;
 	}
-	printf("%s", cached->job.identifier);
+	if(!NOPRINT)
+		printf("%s", cached->job.identifier);
 	lstatus = cached->job.status;
 	return cached->job.pid;
 }
@@ -125,7 +130,7 @@ int gettotaljobs(void) {
 void remount(pstatus running) {
 	if(!cached)
 		return;
-	cached->job.status = RUNNING;
+	cached->job.status = running;
 	cached->next = NULL;
 	if(alljobs.total) {
 		cached->prev = alljobs.tail;
@@ -195,5 +200,16 @@ int printjobbyidentifier(char *identifier) {
 }
 
 void updatejobs(void) {
-		
+	NOPRINT = 1;
+	node *n = alljobs.head;
+	int ws;
+	while(n) {
+		waitpid(n->job.pid, &ws, WNOHANG);
+		if(WIFEXITED(ws)) {
+			printf("[%d]\tdone\t\t%s", n->job.job_number, n->job.identifier);
+			popbynumber(n->job.job_number);
+		}
+		n = n->next;
+	}
+	NOPRINT = 0;
 }
