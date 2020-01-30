@@ -90,12 +90,11 @@ void bg(char *cmd) {
 		}
 		else
 			pid = popjob();
-		if(lstatus == STOPPED) {
+		if(lstatus == STOPPED) 
 			kill(pid, SIGCONT);
-			remount(RUNNING);
-		}
-		else if(lstatus == RUNNING)
+		else if(lstatus == RUNNING) 
 			printf("bg: job already running in background\n");	
+		remount(RUNNING);
 	}
 }
 

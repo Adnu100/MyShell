@@ -62,12 +62,15 @@ int main(int argc, char *argv[]) {
 int analyse_n_execute(char *cmd) {
 	int i, status = 0;
 	char filepath[MAX_FILEPATH], *p;
-	for(i = 0; cmd[i]; i++)
-		if(cmd[i] == '|' || cmd[i] == '>' || cmd[i] == '<' || cmd[i] == '&' || cmd[i] == ';')
-			break;
-		else if(cmd[i] == '2' && cmd[i + 1] == '>')
-			if(i != 0 && (cmd[i - 1] == ' ' || cmd[i - 1] == '\t'))
+	for(i = 0; cmd[i] && (cmd[i] != ';'); i++);
+	if(cmd[i] != ';')
+		for(i = 0; cmd[i]; i++) {
+			if(cmd[i] == '|' || cmd[i] == '>' || cmd[i] == '<' || cmd[i] == '&')
 				break;
+			else if(cmd[i] == '2' && cmd[i + 1] == '>')
+				if(i != 0 && (cmd[i - 1] == ' ' || cmd[i - 1] == '\t'))
+					break;
+		}
 	switch(cmd[i]) {
 		case '|':
 			cmd[i] = '\0';
@@ -95,10 +98,11 @@ int analyse_n_execute(char *cmd) {
 		case '&':
 			cmd[i] = '\0';
 			normalexec(cmd, 0);
+			normalexec(cmd + i + 1, 1);
 			break;
 		case ';':
 			cmd[i] = '\0';
-			normalexec(cmd, 1);
+			analyse_n_execute(cmd);
 			analyse_n_execute(cmd + i + 1);
 			break;
 		case '\0':
@@ -137,10 +141,8 @@ void normalexec(char *cmd, int w) {
 				if(WIFSTOPPED(ws)) 
 					appendjob(unicmd, pid, STOPPED);
 			}
-			else { 
-				waitpid(pid, &ws, WNOHANG | WUNTRACED);
+			else 
 				appendjob(unicmd, pid, RUNNING);
-			}
 			child = 0;
 		}
 	}
@@ -231,7 +233,7 @@ void execute_cmd(char *full_cmd) {
 	if(cmd_name != NULL) {
 		args[0] = cmd_name;
 		i = 1;
-		/* tokeninse the full command into arguments */
+		/* tokenise the full command into arguments */
 		while((args[i++] = strtok(NULL, " \t\n")));
 		if(execvpe(cmd_name, args, environ) == -1) 
 			perror("Error");
