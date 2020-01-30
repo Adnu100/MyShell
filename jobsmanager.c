@@ -39,9 +39,9 @@ void appendjob(char *cmd, pid_t pid, pstatus status) {
 	alljobs.tail->job.status = status;
 	alljobs.total++;
 	if(status == STOPPED) 
-		printf("\n[%d]\tstopped\t%s", alljobs.tail->job.job_number, alljobs.tail->job.identifier);	
+		printf("\n[%d]\tstopped\t\t%s", alljobs.tail->job.job_number, alljobs.tail->job.identifier);	
 	else 
-		printf("[%d] %d", alljobs.tail->job.job_number, pid);
+		printf("[%d] %d\n", alljobs.tail->job.job_number, pid);
 }
 
 pid_t popjob(void) {
@@ -144,7 +144,7 @@ void remount(pstatus running) {
 		cached->job.job_number = 1;
 	}
 	if(running == STOPPED)
-		printf("\n[%d]\tstopped\t%s", cached->job.job_number, cached->job.identifier);
+		printf("\n[%d]\tstopped\t\t%s", cached->job.job_number, cached->job.identifier);
 	alljobs.total++;
 	cached = NULL;
 }
