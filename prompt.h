@@ -1,3 +1,8 @@
+/* this header defines functions and macros related to 
+ * beautifully printing the prompt like
+ * terminal does
+ */
+
 #ifndef PROMPT_H
 #define PROMPT_H
 
@@ -12,7 +17,7 @@
 extern char *LOGIN;
 extern int LENHOME;
 
-void initprompt(void);
-void prompt(void);
+void initprompt(void);		//fill in proper information in HOME, LENHOME and other variables which will be used for printing terminal prompt
+void prompt(void);		//print the prompt
 
 #endif
