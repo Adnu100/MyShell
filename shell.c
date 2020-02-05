@@ -56,6 +56,7 @@ int main(int argc, char *argv[]) {
 		fflush(stdout);
 	}
 	printf("exit\n");
+	jobsdestroyall();
 	return 0;
 }	
 

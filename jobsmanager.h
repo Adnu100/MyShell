@@ -48,6 +48,7 @@ int printalljobs(void);				//print all jobs :)
 int printjobbynumber(int number);		//print nth job and status
 int printjobbyidentifier(char *identifier);	//print job whose name matches with identifier and its status
 void updatejobs(void);				//to be called if SIGCHLD received, linearly checks for all jobs if they have been terminated and then removes them out from the list
+void jobsdestroyall(void);			//frees all the jobs, called when exiting
 
 /* no need to create many lists, there is only one list required to store all jobs
  * so, we reduce the job of passing this to each function and declare it global

@@ -213,3 +213,13 @@ void updatejobs(void) {
 	}
 	NOPRINT = 0;
 }
+
+void jobsdestroyall(void) {
+	node *n = alljobs.head;
+	node *prev = NULL;
+	while(n) {
+		prev = n;
+		n = n->next;
+		free(prev);
+	}
+}
