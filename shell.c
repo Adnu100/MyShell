@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
 int analyse_n_execute(char *cmd) {
 	int i, status = 0;
 	char filepath[MAX_FILEPATH], *p;
+	rdrn_mode_t rdrnmode = IGN;
 	for(i = 0; cmd[i] && (cmd[i] != ';'); i++);
 	if(cmd[i] != ';')
 		for(i = 0; cmd[i]; i++) {
@@ -79,17 +80,18 @@ int analyse_n_execute(char *cmd) {
 			break;
 		case '>':
 			cmd[i] = ' ';
-			strcpy(filepath,  (p = strtok(cmd + i + 1, " \t\n>")));
-			mystrcpy(cmd + i + 1, p + (strlen(p) + 1));
 			switch(cmd[i + 1]) {
 				case '>':
 					cmd[i + 1] = ' ';
-					ioredirexec(cmd, filepath, STDOUT_FILENO, APPEND);
+					rdrnmode = APPEND;
 					break;
 				default:
-					ioredirexec(cmd, filepath, STDOUT_FILENO, ERASE);
+					rdrnmode = ERASE;
 					break;
 			}
+			strcpy(filepath,  (p = strtok(cmd + i + 1, " \t\n")));
+			mystrcpy(cmd + i + 1, p + (strlen(p) + 1));
+			ioredirexec(cmd, filepath, STDOUT_FILENO, rdrnmode);
 			break;
 		case '<':
 			cmd[i] = ' ';
@@ -100,17 +102,18 @@ int analyse_n_execute(char *cmd) {
 		case '2':
 			cmd[i] = ' ';
 			cmd[i + 1] = ' ';
-			strcpy(filepath, (p = strtok(cmd + i + 1, " \t\n>")));
-			strcpy(cmd + i + 1, p + strlen(p) + 1);
 			switch(cmd[i + 2]) {
 				case '>':
 					cmd[i + 2] = ' ';
-					ioredirexec(cmd, filepath, STDERR_FILENO, APPEND);
+					rdrnmode = APPEND;
 					break;
 				default:
-					ioredirexec(cmd, filepath, STDERR_FILENO, ERASE);
+					rdrnmode = ERASE;
 					break;
 			}
+			strcpy(filepath, (p = strtok(cmd + i + 2, " \t\n")));
+			strcpy(cmd + i + 1, p + strlen(p) + 1);
+			ioredirexec(cmd, filepath, STDERR_FILENO, rdrnmode);
 			break;
 		case '&':
 			cmd[i] = '\0';
@@ -204,9 +207,9 @@ void ioredirexec(char *cmd, char *file, int redirection, rdrn_mode_t rdrn_mode) 
 		fd = open(file, O_RDONLY);
 	else if(redirection == STDOUT_FILENO || redirection == STDERR_FILENO) {
 		if(rdrn_mode == APPEND)
-			fd = open(file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+			fd = open(file, O_APPEND | O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 		else
-			fd = open(file, O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+			fd = open(file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	}
 	else {
 		printf("Invalid redirection mode requested");
@@ -235,7 +238,6 @@ void ioredirexec(char *cmd, char *file, int redirection, rdrn_mode_t rdrn_mode) 
 			appendjob(unicmd, pid, STOPPED);
 		child = 0;
 	}
-	ftruncate(fd, lseek(fd, 0, SEEK_CUR));
 	close(fd);
 }
 
